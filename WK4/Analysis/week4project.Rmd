@@ -1,0 +1,146 @@
+---
+title: "Impact of Severe Weather Events in the US"
+output: html_document
+---
+# 1. Synopsis
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+# 2. Getting Raw Data
+A temporary directory called temp was created and file was downloaded using "download.file"
+for the file in this url "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+
+Codes are sourced into markdown chuncks 
+```{r download file,cache=TRUE, echo=TRUE}
+
+temp <- tempfile()
+
+url <-
+        "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(url, temp)
+
+my_file <-
+        read.csv(bzfile(temp, "repdata%2Fdata%2FStormData.csv"),
+                 stringsAsFactors = F)
+unlink(temp)
+
+```
+# 3. Data Processing
+Analysis was based on "EVTYPE",
+                    "FATALITIES",
+                    "INJURIES",
+                    "PROPDMG",
+                    "PROPDMGEXP",
+                    "CROPDMG",
+                    "CROPDMGEXP"
+The below packages are required to process the data:
+Three files ware required to process and clean the data for analysis
+```{r Session Information, echo=TRUE}
+sessionInfo()
+
+```
+
+```{r Explore Data, echo=TRUE}
+
+## Eplore date
+names(my_file)
+
+exc.data <-
+        my_file[, c("EVTYPE",
+                    "FATALITIES",
+                    "INJURIES",
+                    "PROPDMG",
+                    "PROPDMGEXP",
+                    "CROPDMG",
+                    "CROPDMGEXP")]
+unique(exc.data$PROPDMGEXP)
+
+unique(exc.data$CROPDMGEXP)
+
+```
+Cleaning the data:
+
+```{r Clean Data, echo=TRUE}
+library(dplyr)
+cleaned.exc.data <-
+        mutate(
+        exc.data,
+        PROPDMGEXP = ifelse(
+        PROPDMGEXP %in% c("b", "B"),
+        9,
+        ifelse(
+        PROPDMGEXP %in% c("", "+", "-", "?"),
+        0,
+        ifelse(PROPDMGEXP %in% c("m", "M"), 6,
+        ifelse(PROPDMGEXP %in% c("k", "K"), 3, 2))
+        )
+        ),
+        
+        CROPDMGEXP = ifelse(
+        CROPDMGEXP %in% c("", "0", "?"),
+        0,
+        ifelse(
+        CROPDMGEXP %in% c("h", "H"),
+        2,
+        ifelse(CROPDMGEXP %in% c("k", "K"), 2,
+        ifelse(CROPDMGEXP %in% c("m", "M"), 6, 9))
+        )
+        ),
+        PROPDMGEXP_NO = PROPDMGEXP ^ 10,
+        CROPDMGEXP_NO = CROPDMGEXP ^ 10
+        
+        ) %>%
+        group_by(EVTYPE) %>%
+        summarise(
+        FATALITIES = sum(FATALITIES),
+        INJURIES = sum(INJURIES),
+        PROPDMGEXP_NO = sum(PROPDMGEXP_NO),
+        CROPDMGEXP_NO = sum(CROPDMGEXP_NO)
+        )
+```
+Create Data Frame for Final Analysis
+```{r Create Analytic Tables, echo=TRUE}
+## Creating economic data_frame
+## Creating economic data_frame
+economic_data <-
+        mutate(cleaned.exc.data, econ_val = PROPDMGEXP_NO + CROPDMGEXP_NO) %>%
+        select(EVTYPE, econ_val) %>%
+        arrange(desc(econ_val))
+        
+        
+        
+        ## creating health data_frame
+        health_data <-
+        mutate(cleaned.exc.data, health_val = INJURIES + FATALITIES) %>%
+        select(EVTYPE, health_val) %>%
+        arrange(desc(health_val))
+
+```
+
+# 4. Results
+The topmost 10 impact of severe weather in the US are shown below in descending other. They are divided into
+economic and health impact based on events.
+```{r Result, echo=TRUE}
+# Economic impact
+
+
+econ.plot.data <- economic_data[1:10, ]
+
+# Health Impact
+health.plot.data <- health_data[1:10, ]
+
+```
+
+Creating the visual version of the result
+
+```{r Ploting, echo=TRUE}
+library(ggplot2)
+ggplot(econ.plot.data, aes(EVTYPE, econ_val)) + geom_bar(stat = "identity") + coord_flip() + xlab("Event type") + ylab("Crop damage in dollars")
+
+
+
+ggplot(health.plot.data, aes(EVTYPE, health_val)) + geom_bar(stat = "identity") + coord_flip() +
+xlab("Event type") + ylab("Health damage in dollars")
+
+```
+
